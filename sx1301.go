@@ -3,19 +3,18 @@ package sx1301
 import (
 	"sync"
 
+	"github.com/NeuralSpaz/semtech1301/syncrw"
 	rpio "github.com/stianeikeland/go-rpio"
-
 	"golang.org/x/exp/io/spi"
 )
 
-type SynchronousReadWriter interface {
-	ReadRegister(addr byte) (byte, error)
-	WriteRegister(addr byte, data byte) error
-	MultiRead(addr byte, n uint) ([]byte, error)
-	MultiWrite(addr byte, data []byte) error
-}
+func Open(gateway string, cs rpio.Pin) (syncrw.SynchronousReadWriter, error) {
+	// raspberry pi "/dev/spidev0.0"
+	// kerlink "/dev/spidev32766.0"
+	// linklabs 	"/dev/spidev0.0"
+	// Lorank "/dev/spidev1.0"
+	// multitech :S // is it serial
 
-func Open(path string, cs rpio.Pin) (SynchronousReadWriter, error) {
 	dev, err := spi.Open(&spi.Devfs{
 		Dev:      "/dev/spidev0.1",
 		Mode:     spi.Mode0,
