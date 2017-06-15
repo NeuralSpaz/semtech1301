@@ -1,6 +1,8 @@
 package sx1301
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -11,7 +13,7 @@ import (
 	"golang.org/x/exp/io/spi"
 )
 
-func Open(gateway string, cs rpio.Pin) (syncrw.SynchronousReadWriter, error) {
+func Open() (syncrw.SynchronousReadWriter, error) {
 	// raspberry pi "/dev/spidev0.0"
 	// kerlink "/dev/spidev32766.0"
 	// linklabs 	"/dev/spidev0.0"
@@ -38,19 +40,20 @@ func Open(gateway string, cs rpio.Pin) (syncrw.SynchronousReadWriter, error) {
 	// 	return nil, err
 	// }
 	//TODO: make testable using a supplied buffer struct
-	return &sx1301DirectSpi{
-		device:     deviceConn,
+	return &SX1301Spi{
+		Conn:       deviceConn,
 		chipSelect: 0,
 	}, nil
 }
 
-type sx1301DirectSpi struct {
+type SX1301Spi struct {
+	page int8
 	sync.Mutex
-	device     driver.Conn
+	driver.Conn
 	chipSelect rpio.Pin
 }
 
-func (s *sx1301DirectSpi) ReadRegister(address byte) (byte, error) {
+func (s *SX1301Spi) ReadRegister(address byte) (byte, error) {
 	rx := make([]byte, 2)
 	tx := make([]byte, 2)
 
@@ -59,7 +62,7 @@ func (s *sx1301DirectSpi) ReadRegister(address byte) (byte, error) {
 
 	s.Lock()
 	// s.chipSelect.Low()
-	err := s.device.Tx(tx, rx)
+	err := s.Tx(tx, rx)
 	// s.chipSelect.High()
 	s.Unlock()
 	if err != nil {
@@ -69,7 +72,42 @@ func (s *sx1301DirectSpi) ReadRegister(address byte) (byte, error) {
 	return rx[1], nil
 }
 
-func (s *sx1301DirectSpi) WriteRegister(address byte, data byte) error {
+func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
+
+	reg, ok := Registers[sx1301Register]
+	if !ok {
+		return nil, errors.New("error unknown register")
+	}
+	s.Lock()
+	defer s.Unlock()
+	if reg.page != s.page {
+		fmt.Println("Changing Page")
+		// TODO:Change Page
+		// Confirm Page has been changed
+	}
+
+	address := reg.address
+	length := reg.length
+	buffersize := (length / 8)
+
+	if address > 127 {
+		return nil, errors.New("invalid address range, address greater than 127")
+	}
+
+	rx := make([]byte, buffersize+2)
+	tx := make([]byte, buffersize+2)
+
+	tx[0] = clearBit(address, 7)
+	tx[1] = 0x00 // send empty byte for response
+
+	// s.chipSelect.Low()
+	err := s.Tx(tx, rx)
+	// s.chipSelect.High()
+
+	return rx[1:], err
+}
+
+func (s *SX1301Spi) WriteRegister(address byte, data byte) error {
 	rx := make([]byte, 2)
 	tx := make([]byte, 2)
 
@@ -78,21 +116,21 @@ func (s *sx1301DirectSpi) WriteRegister(address byte, data byte) error {
 
 	s.Lock()
 	// s.chipSelect.Low()
-	err := s.device.Tx(tx, rx)
+	err := s.Tx(tx, rx)
 	// s.chipSelect.High()
 	s.Unlock()
 
 	return err
 }
 
-func (s *sx1301DirectSpi) MultiRead(address byte, n uint) ([]byte, error) {
+func (s *SX1301Spi) MultiRead(address byte, n uint) ([]byte, error) {
 	rx := make([]byte, n)
 	tx := make([]byte, n)
 
 	tx[0] = clearBit(address, 7)
 	s.Lock()
 	s.chipSelect.Low()
-	err := s.device.Tx(tx, rx)
+	err := s.Tx(tx, rx)
 	s.chipSelect.High()
 	s.Unlock()
 
@@ -103,7 +141,7 @@ func (s *sx1301DirectSpi) MultiRead(address byte, n uint) ([]byte, error) {
 	return rx, nil
 }
 
-func (s *sx1301DirectSpi) MultiWrite(address byte, data []byte) error {
+func (s *SX1301Spi) MultiWrite(address byte, data []byte) error {
 	rx := make([]byte, len(data)+1)
 	tx := make([]byte, 1)
 
@@ -112,7 +150,7 @@ func (s *sx1301DirectSpi) MultiWrite(address byte, data []byte) error {
 
 	s.Lock()
 	s.chipSelect.Low()
-	err := s.device.Tx(tx, rx)
+	err := s.Tx(tx, rx)
 	s.chipSelect.High()
 	s.Unlock()
 

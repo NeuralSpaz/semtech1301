@@ -112,21 +112,118 @@ func TestWriteRegisterWithLoopBack(t *testing.T) {
 		log.Println("unable to open device")
 	}
 
-	looback := &sx1301DirectSpi{
-		device:     deviceConn,
+	loopback := &SX1301Spi{
+		Conn:       deviceConn,
 		chipSelect: 0,
 	}
 
-	_, err = looback.ReadRegister(0x01)
+	_, err = loopback.ReadRegister(0x01)
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
+	}
+	err = loopback.WriteRegister(0x01, 0x05)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+}
+
+func TestWriteRegisterWithLoopBackMM(t *testing.T) {
+
+	memorymap := make(map[byte]byte)
+	memorymap[0x01] = 0xAA
+	device := spitest.Device{MemoryMap: true, MM: memorymap}
+
+	conn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+	log.Printf("%+#v", conn)
+
+	loopback := &SX1301Spi{
+		Conn:       conn,
+		chipSelect: 0,
 	}
 
-	err = looback.WriteRegister(0x01, 0x05)
+	log.Printf("%+#v\n", loopback)
+
+	value, err := loopback.ReadRegister(0x01)
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	// conn, err := device.Open()
+	log.Printf("%02x\n", value)
+
+}
+
+func TestWriteRegisterByNameWithLoopBackMM(t *testing.T) {
+
+	memorymap := make(map[byte]byte)
+	memorymap[0x01] = 0xAA
+	memorymap[0x21] = 0xBB
+	device := spitest.Device{MemoryMap: true, MM: memorymap}
+
+	conn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+	log.Printf("%+#v", conn)
+
+	loopback := &SX1301Spi{
+		Conn:       conn,
+		chipSelect: 0,
+	}
+
+	log.Printf("%+#v\n", loopback)
+
+	value, err := loopback.ReadRegisterByName("LGW_RX_INVERT_IQ")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("%02x\n", value)
+	//
+	// value, err = loopback.ReadRegisterByName("LGW_RX_DATA_BUF_ADDR")
 	// if err != nil {
-	// 	t.Error("could not open spi test interface")
+	// 	t.Errorf("expected no error but got: %v", err)
+	// }
+	// log.Printf("%02x\n", value)
+
+}
+
+func TestBuildPageMap(t *testing.T) {
+	paged := make(map[byte]int32)
+	page0 := make(map[byte]int32)
+	page1 := make(map[byte]int32)
+	page2 := make(map[byte]int32)
+	page3 := make(map[byte]int32)
+	pagemap := make(map[int8]map[byte]int32)
+	pagemap[-1] = paged
+	pagemap[0] = page0
+	pagemap[1] = page1
+	pagemap[2] = page2
+	pagemap[3] = page3
+	log.Printf("%+#v\n", pagemap)
+	for _, v := range Registers {
+		pagemap[v.page][v.address] = v.defaultValue
+	}
+
+	device := spitest.Device{MemoryMap: true, PM: pagemap}
+
+	conn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+	log.Printf("%+#v", conn)
+
+	loopback := &SX1301Spi{
+		Conn:       conn,
+		chipSelect: 0,
+	}
+
+	log.Printf("%+#v\n", loopback)
+
+	value, err := loopback.ReadRegisterByName("LGW_ADJUST_MODEM_START_OFFSET_SF12_RDX4")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("%02x\n", value)
+
 }
