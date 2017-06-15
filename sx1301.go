@@ -1,7 +1,10 @@
 package sx1301
 
 import (
+	"log"
 	"sync"
+
+	"golang.org/x/exp/io/spi/driver"
 
 	"github.com/NeuralSpaz/semtech1301/syncrw"
 	rpio "github.com/stianeikeland/go-rpio"
@@ -15,31 +18,35 @@ func Open(gateway string, cs rpio.Pin) (syncrw.SynchronousReadWriter, error) {
 	// Lorank "/dev/spidev1.0"
 	// multitech :S // is it serial
 
-	dev, err := spi.Open(&spi.Devfs{
+	device := spi.Devfs{
 		Dev:      "/dev/spidev0.1",
 		Mode:     spi.Mode0,
 		MaxSpeed: 10000000,
-	})
-	//TODO: variadic conf options
-	dev.SetBitOrder(spi.MSBFirst)
-	dev.SetBitsPerWord(8)
-	dev.SetCSChange(false)
-	cs.Output()
-	cs.PullUp()
-
-	if err != nil {
-		return nil, err
 	}
+	deviceConn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+	//TODO: variadic conf options
+	// dev.SetBitOrder(spi.MSBFirst)
+	// dev.SetBitsPerWord(8)
+	// dev.SetCSChange(false)
+	// cs.Output()
+	// cs.PullUp()
+	//
+	// if err != nil {
+	// 	return nil, err
+	// }
 	//TODO: make testable using a supplied buffer struct
 	return &sx1301DirectSpi{
-		device:     dev,
-		chipSelect: cs,
+		device:     deviceConn,
+		chipSelect: 0,
 	}, nil
 }
 
 type sx1301DirectSpi struct {
 	sync.Mutex
-	device     *spi.Device
+	device     driver.Conn
 	chipSelect rpio.Pin
 }
 
@@ -51,9 +58,9 @@ func (s *sx1301DirectSpi) ReadRegister(address byte) (byte, error) {
 	tx[1] = 0x00 // send empty byte for response
 
 	s.Lock()
-	s.chipSelect.Low()
+	// s.chipSelect.Low()
 	err := s.device.Tx(tx, rx)
-	s.chipSelect.High()
+	// s.chipSelect.High()
 	s.Unlock()
 	if err != nil {
 		return 0, err
@@ -70,14 +77,10 @@ func (s *sx1301DirectSpi) WriteRegister(address byte, data byte) error {
 	tx[1] = data
 
 	s.Lock()
-	s.chipSelect.Low()
+	// s.chipSelect.Low()
 	err := s.device.Tx(tx, rx)
-	s.chipSelect.High()
+	// s.chipSelect.High()
 	s.Unlock()
-
-	if err != nil {
-		return err
-	}
 
 	return err
 }

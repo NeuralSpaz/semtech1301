@@ -6,3 +6,8 @@ type SynchronousReadWriter interface {
 	MultiRead(addr byte, n uint) ([]byte, error)
 	MultiWrite(addr byte, data []byte) error
 }
+
+type DuplexReadWriter interface {
+	ReadFromReg(addr byte, n uint) (rx []byte, err error)
+	WriteToReg(addr byte, tx []byte) (err error)
+}

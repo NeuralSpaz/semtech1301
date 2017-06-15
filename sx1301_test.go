@@ -1,6 +1,32 @@
 package sx1301
 
-import "testing"
+import (
+	"log"
+	"testing"
+
+	"github.com/NeuralSpaz/semtech1301/spitest"
+)
+
+// type SynchronousReadWriter interface {
+// 	ReadRegister(addr byte) (byte, error)
+// 	WriteRegister(addr byte, data byte) error
+// 	MultiRead(addr byte, n uint) ([]byte, error)
+// 	MultiWrite(addr byte, data []byte) error
+// }
+
+func NewSynchronousReadWriter() {
+	// return SynchronousReadWriter
+
+	return
+}
+
+func TestReadRegister(t *testing.T) {
+	return
+}
+
+func TestWriteRegister(t *testing.T) {
+
+}
 
 func TestClearbit(t *testing.T) {
 	var bitTests = []struct {
@@ -77,4 +103,30 @@ func TestHasbit(t *testing.T) {
 			t.Errorf("want %t but got %t for %02x", test.want, got, test.n)
 		}
 	}
+}
+
+func TestWriteRegisterWithLoopBack(t *testing.T) {
+	device := spitest.Device{}
+	deviceConn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+
+	looback := &sx1301DirectSpi{
+		device:     deviceConn,
+		chipSelect: 0,
+	}
+
+	_, err = looback.ReadRegister(0x01)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+
+	err = looback.WriteRegister(0x01, 0x05)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	// conn, err := device.Open()
+	// if err != nil {
+	// 	t.Error("could not open spi test interface")
 }
