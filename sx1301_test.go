@@ -224,6 +224,29 @@ func TestBuildPageMap(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	log.Printf("%02x\n", value)
+	log.Printf("LGW_ADJUST_MODEM_START_OFFSET_SF12_RDX4: %d\n", value)
 
+	value, err = loopback.ReadRegisterByName("LGW_IF_FREQ_0")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("LGW_IF_FREQ_0: %d\n", value)
+
+	value, err = loopback.ReadRegisterByName("LGW_TX_STATUS")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("LGW_TX_STATUS: %d\n", value)
+
+	value, err = loopback.ReadRegisterByName("LGW_TIMESTAMP")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("LGW_TIMESTAMP: %d\n", value)
+
+	value, err = loopback.ReadRegisterByName("LGW_VERSION")
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	log.Printf("LGW_VERSION: %d\n", value)
 }

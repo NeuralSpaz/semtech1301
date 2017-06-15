@@ -156,8 +156,8 @@ var Registers = map[string]loraRegister{
 	"LGW_PAYLOAD_FINE_TIMING_GAIN":            {0, 94, 0, false, 2, false, 2},     /* PAYLOAD_FINE_TIMING_GAIN */
 	"LGW_PREAMBLE_FINE_TIMING_GAIN":           {0, 94, 2, false, 2, false, 1},     /* PREAMBLE_FINE_TIMING_GAIN */
 	"LGW_TRACKING_INTEGRAL":                   {0, 94, 4, false, 2, false, 0},     /* TRACKING_INTEGRAL */
-	"LGW_FRAME_SYNCH_PEAK1_POS":               {0, 95, 0, false, 4, false, 1},     /* FRAME_SYNCH_PEAK1_POS */
-	"LGW_FRAME_SYNCH_PEAK2_POS":               {0, 95, 4, false, 4, false, 2},     /* FRAME_SYNCH_PEAK2_POS */
+	"LGW_FRAME_SYNCH_PEAK1_POS":               {0, 95, 0, false, 4, false, 1},     /* FRAME_SYNCH_PEAK1_POS */ //ALSO SOMETHING TO DO WITH SYNC WORD
+	"LGW_FRAME_SYNCH_PEAK2_POS":               {0, 95, 4, false, 4, false, 2},     /* FRAME_SYNCH_PEAK2_POS */ //ALSO SOMETHING TO DO WITH SYNC WORD
 	"LGW_PREAMBLE_SYMB1_NB":                   {0, 96, 0, false, 16, false, 10},   /* PREAMBLE_SYMB1_NB */
 	"LGW_FRAME_SYNCH_GAIN":                    {0, 98, 0, false, 1, false, 1},     /* FRAME_SYNCH_GAIN */
 	"LGW_SYNCH_DETECT_TH":                     {0, 98, 1, false, 1, false, 1},     /* SYNCH_DETECT_TH */
@@ -196,8 +196,8 @@ var Registers = map[string]loraRegister{
 	"LGW_TX_TRIG_DELAYED":                     {1, 33, 1, false, 1, false, 0},     /* TX_TRIG_DELAYED */
 	"LGW_TX_TRIG_GPS":                         {1, 33, 2, false, 1, false, 0},     /* TX_TRIG_GPS */
 	"LGW_TX_START_DELAY":                      {1, 34, 0, false, 16, false, 0},    /* TX_START_DELAY */
-	"LGW_TX_FRAME_SYNCH_PEAK1_POS":            {1, 36, 0, false, 4, false, 1},     /* TX_FRAME_SYNCH_PEAK1_POS */
-	"LGW_TX_FRAME_SYNCH_PEAK2_POS":            {1, 36, 4, false, 4, false, 2},     /* TX_FRAME_SYNCH_PEAK2_POS */
+	"LGW_TX_FRAME_SYNCH_PEAK1_POS":            {1, 36, 0, false, 4, false, 1},     /* TX_FRAME_SYNCH_PEAK1_POS */ //I THINK WHAT SYNCWORD IS USED FOR TX
+	"LGW_TX_FRAME_SYNCH_PEAK2_POS":            {1, 36, 4, false, 4, false, 2},     /* TX_FRAME_SYNCH_PEAK2_POS */ //I THINK WHAT SYNCWORD IS USED FOR TX
 	"LGW_TX_RAMP_DURATION":                    {1, 37, 0, false, 3, false, 0},     /* TX_RAMP_DURATION */
 	"LGW_TX_OFFSET_I":                         {1, 39, 0, true, 8, false, 0},      /* TX_OFFSET_I */
 	"LGW_TX_OFFSET_Q":                         {1, 40, 0, true, 8, false, 0},      /* TX_OFFSET_Q */
@@ -214,8 +214,8 @@ var Registers = map[string]loraRegister{
 	"LGW_MBWSSF_IMPLICIT_CODING_RATE":         {1, 43, 2, false, 3, false, 0},     /* MBWSSF_IMPLICIT_CODING_RATE */
 	"LGW_MBWSSF_IMPLICIT_PAYLOAD_LENGHT":      {1, 44, 0, false, 8, false, 0},     /* MBWSSF_IMPLICIT_PAYLOAD_LENGHT */
 	"LGW_MBWSSF_AGC_FREEZE_ON_DETECT":         {1, 45, 0, false, 1, false, 1},     /* MBWSSF_AGC_FREEZE_ON_DETECT */
-	"LGW_MBWSSF_FRAME_SYNCH_PEAK1_POS":        {1, 46, 0, false, 4, false, 1},     /* MBWSSF_FRAME_SYNCH_PEAK1_POS */
-	"LGW_MBWSSF_FRAME_SYNCH_PEAK2_POS":        {1, 46, 4, false, 4, false, 2},     /* MBWSSF_FRAME_SYNCH_PEAK2_POS */
+	"LGW_MBWSSF_FRAME_SYNCH_PEAK1_POS":        {1, 46, 0, false, 4, false, 1},     /* MBWSSF_FRAME_SYNCH_PEAK1_POS */ //AKA SYNC WORD
+	"LGW_MBWSSF_FRAME_SYNCH_PEAK2_POS":        {1, 46, 4, false, 4, false, 2},     /* MBWSSF_FRAME_SYNCH_PEAK2_POS */ //AKA SYNC WORD
 	"LGW_MBWSSF_PREAMBLE_SYMB1_NB":            {1, 47, 0, false, 16, false, 10},   /* MBWSSF_PREAMBLE_SYMB1_NB */
 	"LGW_MBWSSF_FRAME_SYNCH_GAIN":             {1, 49, 0, false, 1, false, 1},     /* MBWSSF_FRAME_SYNCH_GAIN */
 	"LGW_MBWSSF_SYNCH_DETECT_TH":              {1, 49, 1, false, 1, false, 1},     /* MBWSSF_SYNCH_DETECT_TH */

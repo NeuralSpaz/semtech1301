@@ -92,21 +92,31 @@ func (s *PMDeviceConn) Tx(w, r []byte) error {
 	log.Println("Length of tx", len(w))
 	// get current page
 	pg := int8(s.PM[-1][0x00] & 0x03)
+
 	fmt.Printf("current page: %d\n", pg)
 	address := clearBit(w[0], 7)
-
-	value, ok := s.PM[pg][address]
-	if !ok {
-		return errors.New("no value mapped to register")
+	if address < 33 {
+		pg = -1 //all page -1 registers are all 32 or less
 	}
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, uint32(value))
-	fmt.Printf("%08x\n", buf)
-	// if hasBit(w[0], 7) {
-	// 	s.MM[address] = w[1]
-	// } else {
-	// 	r[1] = value
-	// }
+	if hasBit(w[0], 7) { // WriteRegister
+		fmt.Println("Write request")
+		if address == 0x00 { // change page
+			fmt.Println("page change request")
+			s.PM[-1][0x00] = int32(w[1] & 0x03) // force int32
+		}
+	} else { // ReadRegister
+		value, ok := s.PM[pg][address]
+		if !ok {
+			return errors.New("no value mapped to register")
+		}
+		buf := make([]byte, 4)
+		binary.BigEndian.PutUint32(buf, uint32(value))
+		fmt.Printf("%08x\n", buf)
+		r[0] = 0x00 // always garbage
+		copy(r[1:], buf[len(buf)-(len(r)-1):])
+
+	}
+
 	return nil
 }
 

@@ -18,7 +18,7 @@ func Open() (syncrw.SynchronousReadWriter, error) {
 	// kerlink "/dev/spidev32766.0"
 	// linklabs 	"/dev/spidev0.0"
 	// Lorank "/dev/spidev1.0"
-	// multitech :S // is it serial
+	// multitech :S // is it serial, yes it is -eric@ttn
 
 	device := spi.Devfs{
 		Dev:      "/dev/spidev0.1",
@@ -75,29 +75,33 @@ func (s *SX1301Spi) ReadRegister(address byte) (byte, error) {
 func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 
 	reg, ok := Registers[sx1301Register]
+	fmt.Printf("reg %+v\n", reg)
 	if !ok {
 		return nil, errors.New("error unknown register")
 	}
-	s.Lock()
-	defer s.Unlock()
-	if reg.page != s.page {
-		fmt.Println("Changing Page")
-		// TODO:Change Page
-		// Confirm Page has been changed
-	}
-
-	address := reg.address
-	length := reg.length
-	buffersize := (length / 8)
-
-	if address > 127 {
+	if reg.address > 127 {
 		return nil, errors.New("invalid address range, address greater than 127")
 	}
 
-	rx := make([]byte, buffersize+2)
-	tx := make([]byte, buffersize+2)
+	s.Lock()
+	defer s.Unlock()
+	if reg.address > 32 && reg.page != s.page {
+		fmt.Println("Changing Page")
+		s.changeRegisterPage(reg.page)
+		// TODO: Confirm Page has been changed
+	}
 
-	tx[0] = clearBit(address, 7)
+	buffersize := (reg.length / 8) + 1 //needs extra byte
+	align := reg.length % 8
+	if align > 0 {
+		buffersize++
+	}
+	fmt.Println("buffersize ", buffersize)
+
+	rx := make([]byte, buffersize)
+	tx := make([]byte, buffersize)
+
+	tx[0] = clearBit(reg.address, 7)
 	tx[1] = 0x00 // send empty byte for response
 
 	// s.chipSelect.Low()
@@ -106,6 +110,21 @@ func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 
 	return rx[1:], err
 }
+
+// only call if you have taken the lock and are within a transaction
+func (s *SX1301Spi) changeRegisterPage(pg int8) error {
+	fmt.Println("staring page change")
+	if pg < 1 || pg > 2 {
+		return errors.New("invalid address page")
+	}
+	rx := make([]byte, 2)
+	tx := make([]byte, 2)
+	tx[0] = setBit(0x00, 7)
+	tx[1] = byte(pg)
+	return s.Tx(tx, rx)
+}
+
+func (s *SX1301Spi) WriteRegisterByName(sx1301Register string, data ...byte) error { return nil } //TODO: write to the registers by name}
 
 func (s *SX1301Spi) WriteRegister(address byte, data byte) error {
 	rx := make([]byte, 2)
