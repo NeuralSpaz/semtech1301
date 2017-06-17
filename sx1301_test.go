@@ -14,19 +14,19 @@ import (
 // 	MultiWrite(addr byte, data []byte) error
 // }
 
-func NewSynchronousReadWriter() {
-	// return SynchronousReadWriter
-
-	return
-}
-
-func TestReadRegister(t *testing.T) {
-	return
-}
-
-func TestWriteRegister(t *testing.T) {
-
-}
+// func NewSynchronousReadWriter() {
+// 	// return SynchronousReadWriter
+//
+// 	return
+// }
+//
+// func TestReadRegister(t *testing.T) {
+// 	return
+// }
+//
+// func TestWriteRegister(t *testing.T) {
+//
+// }
 
 func TestClearbit(t *testing.T) {
 	var bitTests = []struct {
@@ -106,6 +106,7 @@ func TestHasbit(t *testing.T) {
 }
 
 func TestWriteRegisterWithLoopBack(t *testing.T) {
+
 	device := spitest.Device{}
 	deviceConn, err := device.Open()
 	if err != nil {
@@ -114,17 +115,99 @@ func TestWriteRegisterWithLoopBack(t *testing.T) {
 
 	loopback := &SX1301Spi{
 		Conn:       deviceConn,
-		chipSelect: 0,
+		ChipSelect: new(spitest.Pin),
 	}
 
-	_, err = loopback.ReadRegister(0x01)
-	if err != nil {
-		t.Errorf("expected no error but got: %v", err)
-	}
 	err = loopback.WriteRegister(0x01, 0x05)
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
+}
+
+func TestReadRegisterWithLoopBack(t *testing.T) {
+
+	device := spitest.Device{}
+	deviceConn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+
+	loopback := &SX1301Spi{
+		Conn:       deviceConn,
+		ChipSelect: new(spitest.Pin),
+	}
+	var data byte = 0x01
+
+	register, err := loopback.ReadRegister(data)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+	if register != 0x00 {
+		t.Errorf("expected register to be 0x00 but got : %v", register)
+	}
+}
+
+func TestChipSelectActiveLow(t *testing.T) {
+
+	device := spitest.Device{}
+	deviceConn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+
+	loopback := &SX1301Spi{
+		Conn:         deviceConn,
+		ChipSelect:   new(spitest.Pin),
+		csActiveHigh: false,
+	}
+	loopback.Lock()
+	loopback.chipEnable()
+
+	if loopback.ChipSelect.State() != 1 {
+		t.Errorf("expected chip to be enabled, %v", loopback.ChipSelect.State())
+	}
+
+	loopback.Unlock()
+
+	loopback.Lock()
+	loopback.chipDisable()
+
+	if loopback.ChipSelect.State() != 0 {
+		t.Errorf("expected chip to be disabled, %v", loopback.ChipSelect.State())
+	}
+
+	loopback.Unlock()
+}
+
+func TestChipSelectActiveHigh(t *testing.T) {
+
+	device := spitest.Device{}
+	deviceConn, err := device.Open()
+	if err != nil {
+		log.Println("unable to open device")
+	}
+
+	loopback := &SX1301Spi{
+		Conn:         deviceConn,
+		ChipSelect:   new(spitest.Pin),
+		csActiveHigh: true,
+	}
+	loopback.Lock()
+	loopback.chipEnable()
+
+	if loopback.ChipSelect.State() != 0 {
+		t.Errorf("expected chip to be enabled, %v", loopback.ChipSelect.State())
+	}
+
+	loopback.Unlock()
+
+	loopback.Lock()
+	loopback.chipDisable()
+	if loopback.ChipSelect.State() != 1 {
+		t.Errorf("expected chip to be disabled, %v", loopback.ChipSelect.State())
+	}
+
+	loopback.Unlock()
 }
 
 func TestWriteRegisterWithLoopBackMM(t *testing.T) {
@@ -141,7 +224,7 @@ func TestWriteRegisterWithLoopBackMM(t *testing.T) {
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
-		chipSelect: 0,
+		ChipSelect: new(spitest.Pin),
 	}
 
 	log.Printf("%+#v\n", loopback)
@@ -169,7 +252,7 @@ func TestWriteRegisterByNameWithLoopBackMM(t *testing.T) {
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
-		chipSelect: 0,
+		ChipSelect: new(spitest.Pin),
 	}
 
 	log.Printf("%+#v\n", loopback)
@@ -205,6 +288,8 @@ func TestBuildPageMap(t *testing.T) {
 		pagemap[v.page][v.address] = v.defaultValue
 	}
 
+	// var cs spitest.Pin
+
 	device := spitest.Device{MemoryMap: true, PM: pagemap}
 
 	conn, err := device.Open()
@@ -215,7 +300,7 @@ func TestBuildPageMap(t *testing.T) {
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
-		chipSelect: 0,
+		ChipSelect: new(spitest.Pin),
 	}
 
 	log.Printf("%+#v\n", loopback)
