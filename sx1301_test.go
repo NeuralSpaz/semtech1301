@@ -1,6 +1,7 @@
 package sx1301
 
 import (
+	"encoding/binary"
 	"log"
 	"testing"
 
@@ -210,7 +211,7 @@ func TestChipSelectActiveHigh(t *testing.T) {
 	loopback.Unlock()
 }
 
-func TestWriteRegisterWithLoopBackMM(t *testing.T) {
+func TestReadRegisterWithLoopBackMM(t *testing.T) {
 
 	memorymap := make(map[byte]byte)
 	memorymap[0x01] = 0xAA
@@ -220,24 +221,20 @@ func TestWriteRegisterWithLoopBackMM(t *testing.T) {
 	if err != nil {
 		log.Println("unable to open device")
 	}
-	log.Printf("%+#v", conn)
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
 		ChipSelect: new(spitest.Pin),
 	}
 
-	log.Printf("%+#v\n", loopback)
-
-	value, err := loopback.ReadRegister(0x01)
+	_, err = loopback.ReadRegister(0x01)
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	log.Printf("%02x\n", value)
 
 }
 
-func TestWriteRegisterByNameWithLoopBackMM(t *testing.T) {
+func TestReadRegisterByNameWithLoopBackMM(t *testing.T) {
 
 	memorymap := make(map[byte]byte)
 	memorymap[0x01] = 0xAA
@@ -248,20 +245,17 @@ func TestWriteRegisterByNameWithLoopBackMM(t *testing.T) {
 	if err != nil {
 		log.Println("unable to open device")
 	}
-	log.Printf("%+#v", conn)
+	// log.Printf("%+#v", conn)
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
 		ChipSelect: new(spitest.Pin),
 	}
 
-	log.Printf("%+#v\n", loopback)
-
-	value, err := loopback.ReadRegisterByName("LGW_RX_INVERT_IQ")
+	_, err = loopback.ReadRegisterByName("LGW_RX_INVERT_IQ")
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	log.Printf("%02x\n", value)
 	//
 	// value, err = loopback.ReadRegisterByName("LGW_RX_DATA_BUF_ADDR")
 	// if err != nil {
@@ -271,24 +265,34 @@ func TestWriteRegisterByNameWithLoopBackMM(t *testing.T) {
 
 }
 
-func TestBuildPageMap(t *testing.T) {
+// helper
+func initPageMapForsx1301() map[int8]map[byte]int32 {
 	paged := make(map[byte]int32)
 	page0 := make(map[byte]int32)
 	page1 := make(map[byte]int32)
 	page2 := make(map[byte]int32)
-	page3 := make(map[byte]int32)
 	pagemap := make(map[int8]map[byte]int32)
 	pagemap[-1] = paged
 	pagemap[0] = page0
 	pagemap[1] = page1
 	pagemap[2] = page2
-	pagemap[3] = page3
-	log.Printf("%+#v\n", pagemap)
+
+	//TODO:
+	// need to be actual regiser map combining what actual register would
+	// return not just the default value ie map[page]map[address]byte so
+	// that read register and write register and by name are written correctly
+	// and tested before actual hardware is used.
+	// Capture from logic analiser should match testing buffer.
 	for _, v := range Registers {
 		pagemap[v.page][v.address] = v.defaultValue
 	}
 
-	// var cs spitest.Pin
+	return pagemap
+}
+
+// helper
+func newPageMappedSX1301() *SX1301Spi {
+	pagemap := initPageMapForsx1301()
 
 	device := spitest.Device{MemoryMap: true, PM: pagemap}
 
@@ -296,42 +300,80 @@ func TestBuildPageMap(t *testing.T) {
 	if err != nil {
 		log.Println("unable to open device")
 	}
-	log.Printf("%+#v", conn)
 
 	loopback := &SX1301Spi{
 		Conn:       conn,
 		ChipSelect: new(spitest.Pin),
 	}
+	return loopback
+}
 
-	log.Printf("%+#v\n", loopback)
+func TestBuildPageMap(t *testing.T) {
+
+	loopback := newPageMappedSX1301()
 
 	value, err := loopback.ReadRegisterByName("LGW_ADJUST_MODEM_START_OFFSET_SF12_RDX4")
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	log.Printf("LGW_ADJUST_MODEM_START_OFFSET_SF12_RDX4: %d\n", value)
+	registerDefault := Registers["LGW_ADJUST_MODEM_START_OFFSET_SF12_RDX4"].defaultValue
+	want := make([]byte, 4)
+	binary.BigEndian.PutUint32(want, uint32(registerDefault))
+	for k := range value {
+		if value[k] != want[k+(4-len(value))] {
+			t.Errorf("expected the same value as default %v but got %v", want, value)
+		}
+	}
+}
 
-	value, err = loopback.ReadRegisterByName("LGW_IF_FREQ_0")
+func TestChangePagedRegisterMapPageRange(t *testing.T) {
+
+	loopback := newPageMappedSX1301()
+
+	tests := []struct {
+		page int8
+		want error
+	}{
+		{-1, PageOutOfRangeError},
+		{0, nil},
+		{1, nil},
+		{2, nil},
+		{3, PageOutOfRangeError},
+	}
+
+	for i, test := range tests {
+
+		got := loopback.changeRegisterPage(test.page)
+		if got != test.want {
+			t.Errorf("case %d: for page %d expected %v but got %v ", i, test.page, test.want, got)
+		}
+	}
+}
+
+func TestPageMappedRegisterReadWithInvalidName(t *testing.T) {
+
+	loopback := newPageMappedSX1301()
+
+	_, err := loopback.ReadRegisterByName("DUMMY")
+	if err != UknownRegisterNameError {
+		t.Errorf("expected unknown register but got: %v", err)
+	}
+}
+
+func TestReadRegisterByNamePMWithPageChange(t *testing.T) {
+
+	loopback := newPageMappedSX1301()
+
+	value, err := loopback.ReadRegisterByName("LGW_TX_STATUS")
 	if err != nil {
 		t.Errorf("expected no error but got: %v", err)
 	}
-	log.Printf("LGW_IF_FREQ_0: %d\n", value)
-
-	value, err = loopback.ReadRegisterByName("LGW_TX_STATUS")
-	if err != nil {
-		t.Errorf("expected no error but got: %v", err)
+	registerDefault := Registers["LGW_TX_STATUS"].defaultValue
+	want := make([]byte, 4)
+	binary.BigEndian.PutUint32(want, uint32(registerDefault))
+	for k := range value {
+		if value[k] != want[k+(4-len(value))] {
+			t.Errorf("expected the same value as default %v but got %v", want, value)
+		}
 	}
-	log.Printf("LGW_TX_STATUS: %d\n", value)
-
-	value, err = loopback.ReadRegisterByName("LGW_TIMESTAMP")
-	if err != nil {
-		t.Errorf("expected no error but got: %v", err)
-	}
-	log.Printf("LGW_TIMESTAMP: %d\n", value)
-
-	value, err = loopback.ReadRegisterByName("LGW_VERSION")
-	if err != nil {
-		t.Errorf("expected no error but got: %v", err)
-	}
-	log.Printf("LGW_VERSION: %d\n", value)
 }

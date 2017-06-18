@@ -1,9 +1,6 @@
 package spitest
 
-import (
-	"log"
-	"testing"
-)
+import "testing"
 
 func TestEmptyTests(t *testing.T) {}
 
@@ -300,8 +297,6 @@ func TestPageMapWriteSimpleMap(t *testing.T) {
 	r := make([]byte, 2)
 
 	err = pmloop.Tx(w, r)
-	log.Println(err)
-	log.Println("page :", byte(pm[-1][0x0B]))
 
 	if byte(pm[-1][0x0B]) != 0xAA {
 		t.Errorf("expected 0xAA but got %v ", byte(pm[-1][0x0B]))

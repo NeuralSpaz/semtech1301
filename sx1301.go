@@ -2,7 +2,7 @@ package sx1301
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"sync"
 
 	"golang.org/x/exp/io/spi/driver"
@@ -110,23 +110,43 @@ func (s *SX1301Spi) WriteRegister(address byte, data byte) error {
 	return err
 }
 
+var (
+	UknownRegisterNameError = errors.New("error unknown register")
+	InvalidRegisterAddress  = errors.New("error invalid register address greater than 127")
+)
+
 func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 
 	reg, ok := Registers[sx1301Register]
-	fmt.Printf("reg %+v\n", reg)
+	// fmt.Printf("reg %+v\n", reg)
 	if !ok {
-		return nil, errors.New("error unknown register")
+		return nil, UknownRegisterNameError
 	}
+	// should be impossible to get this error with correct Registers Map
 	if reg.address > 127 {
-		return nil, errors.New("invalid address range, address greater than 127")
+		return nil, InvalidRegisterAddress
 	}
 
 	s.Lock()
 	defer s.Unlock()
+	// Registers 32 and below are always the default page
 	if reg.address > 32 && reg.page != s.page {
-		fmt.Println("Changing Page")
-		s.changeRegisterPage(reg.page)
-		// TODO: Confirm Page has been changed
+		err := s.changeRegisterPage(reg.page)
+		if err != nil {
+			// TODO: do something better with error
+			// when we know what can fail here
+			log.Panicln("error while changing page: ", err)
+		}
+		currentPage, err := s.getCurrentRegisterPage()
+		if err != nil {
+			// TODO: do something better with error
+			// when we know what can fail here
+			log.Panicln("error reading current page: ", err)
+		}
+		if currentPage != reg.page {
+			return nil, errors.New("Failed to change to correct register page")
+		}
+		s.page = reg.page
 	}
 
 	buffersize := (reg.length / 8) + 1 //needs extra byte
@@ -134,7 +154,7 @@ func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 	if align > 0 {
 		buffersize++
 	}
-	fmt.Println("buffersize ", buffersize)
+	// fmt.Println("buffersize ", buffersize)
 
 	rx := make([]byte, buffersize)
 	tx := make([]byte, buffersize)
@@ -142,27 +162,56 @@ func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 	tx[0] = clearBit(reg.address, 7)
 	tx[1] = 0x00 // send empty byte for response
 
-	// s.chipSelect.Low()
+	s.chipEnable()
 	err := s.Tx(tx, rx)
-	// s.chipSelect.High()
+	s.chipDisable()
 
+	// first byte always gargabe
 	return rx[1:], err
 }
 
+var PageOutOfRangeError error = errors.New("memory page out of range")
+
 // only call if you have taken the lock and are within a transaction
 func (s *SX1301Spi) changeRegisterPage(pg int8) error {
-	fmt.Println("staring page change")
-	if pg < 1 || pg > 2 {
-		return errors.New("invalid address page")
+	// fmt.Println("staring page change")
+	if pg < 0 || pg > 2 {
+		return PageOutOfRangeError
 	}
 	rx := make([]byte, 2)
-	tx := make([]byte, 2)
-	tx[0] = setBit(0x00, 7)
-	tx[1] = byte(pg)
-	return s.Tx(tx, rx)
+	tx := []byte{0x80, byte(pg)}
+	s.chipEnable()
+	err := s.Tx(tx, rx)
+	s.chipDisable()
+	return err
 }
 
-func (s *SX1301Spi) WriteRegisterByName(sx1301Register string, data ...byte) error { return nil } //TODO: write to the registers by name}
+func (s *SX1301Spi) getCurrentRegisterPage() (int8, error) {
+	// fmt.Println("staring page change")
+	rx := make([]byte, 2)
+	tx := []byte{0x00, 0x00} // read page register
+	s.chipEnable()
+	err := s.Tx(tx, rx)
+	s.chipDisable()
+	return int8(rx[1] & 0x03), err
+
+}
+
+func (s *SX1301Spi) WriteRegisterByName(sx1301Register string, data ...byte) error {
+	//TODO: write to the registers by name
+
+	// lookup register name from register map
+
+	// take lock
+	// read register
+
+	// modify with new data by alignment according to bit position in register map
+
+	// write new data
+	// release lock
+	return nil
+
+}
 
 // func (s *SX1301Spi) MultiRead(address byte, n uint) ([]byte, error) {
 // 	rx := make([]byte, n)

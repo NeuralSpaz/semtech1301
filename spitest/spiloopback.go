@@ -3,8 +3,6 @@ package spitest
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"log"
 	"sync"
 
 	"golang.org/x/exp/io/spi/driver"
@@ -93,7 +91,7 @@ func (s *PMDeviceConn) Tx(w, r []byte) error {
 	if len(w) != len(r) {
 		return UnequalBufferError
 	}
-	log.Println("Length of tx", len(w))
+	// log.Println("Length of tx", len(w))
 	// get current page
 	page, ok := s.PM[-1][0x00] // check the current page pointer
 	if !ok {
@@ -108,9 +106,9 @@ func (s *PMDeviceConn) Tx(w, r []byte) error {
 		pg = -1 //all page -1 registers are all 32 or less
 	}
 	if hasBit(w[0], 7) { // WriteRegister
-		fmt.Println("Write request")
+		// fmt.Println("Write request")
 		if address == 0x00 { // change page
-			fmt.Println("page change request")
+			// fmt.Println("page change request")
 			s.PM[-1][0x00] = int32(w[1] & 0x03) // force int32
 		} else {
 			s.PM[pg][address] = int32(w[1])
@@ -122,7 +120,7 @@ func (s *PMDeviceConn) Tx(w, r []byte) error {
 		// }
 		buf := make([]byte, 4)
 		binary.BigEndian.PutUint32(buf, uint32(value))
-		fmt.Printf("%08x\n", buf)
+		// fmt.Printf("%08x\n", buf)
 		r[0] = 0x00 // always garbage
 		copy(r[1:], buf[len(buf)-(len(r)-1):])
 
