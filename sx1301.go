@@ -115,6 +115,7 @@ var (
 	InvalidRegisterAddress  = errors.New("error invalid register address greater than 127")
 )
 
+// Returns []byte value of the register by the name of the register of the Registers table.
 func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 
 	reg, ok := Registers[sx1301Register]
@@ -159,14 +160,16 @@ func (s *SX1301Spi) ReadRegisterByName(sx1301Register string) ([]byte, error) {
 	rx := make([]byte, buffersize)
 	tx := make([]byte, buffersize)
 
-	tx[0] = clearBit(reg.address, 7)
-	tx[1] = 0x00 // send empty byte for response
+	for i := 0; i < int(buffersize-1); i++ {
+		tx[i] = clearBit(reg.address+byte(i), 7)
+	}
+	// fmt.Println(tx)
 
 	s.chipEnable()
 	err := s.Tx(tx, rx)
 	s.chipDisable()
 
-	// first byte always gargabe
+	// first byte gargabe
 	return rx[1:], err
 }
 
@@ -187,7 +190,7 @@ func (s *SX1301Spi) changeRegisterPage(pg int8) error {
 }
 
 func (s *SX1301Spi) getCurrentRegisterPage() (int8, error) {
-	// fmt.Println("staring page change")
+	// TODO: don't like this refactor
 	rx := make([]byte, 2)
 	tx := []byte{0x00, 0x00} // read page register
 	s.chipEnable()

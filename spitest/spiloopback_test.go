@@ -114,7 +114,7 @@ func TestOpenWithMemoryMap(t *testing.T) {
 }
 
 func TestOpenWithPagedMap(t *testing.T) {
-	mm := make(map[int8]map[byte]int32)
+	mm := make(map[byte]map[byte]byte)
 	pageMaped := &Device{PM: mm}
 	_, err := pageMaped.Open()
 	if err != nil {
@@ -172,7 +172,7 @@ func TestMemoryMapUnqualBuffers(t *testing.T) {
 }
 
 func TestPageMapUnqualBuffers(t *testing.T) {
-	mm := make(map[int8]map[byte]int32)
+	mm := make(map[byte]map[byte]byte)
 	pageMaped := &Device{PM: mm}
 	pmloop, err := pageMaped.Open()
 	if err != nil {
@@ -249,7 +249,7 @@ func TestMemoryMapWrite(t *testing.T) {
 }
 
 func TestPageMapWithEmptyMap(t *testing.T) {
-	pm := make(map[int8]map[byte]int32)
+	pm := make(map[byte]map[byte]byte)
 	pageMaped := &Device{PM: pm}
 	pmloop, err := pageMaped.Open()
 	if err != nil {
@@ -264,15 +264,15 @@ func TestPageMapWithEmptyMap(t *testing.T) {
 }
 
 func TestPageMapReadSimpleMap(t *testing.T) {
-	pm := make(map[int8]map[byte]int32)
+	pm := make(map[byte]map[byte]byte)
 	pageMaped := &Device{PM: pm}
 	pmloop, err := pageMaped.Open()
 	if err != nil {
 		t.Errorf("expect nil error but got %v: ", err)
 	}
-	defaultPage := make(map[byte]int32)
-	pm[-1] = defaultPage
-	pm[-1][0x00] = 0
+	defaultPage := make(map[byte]byte)
+	pm[0x00] = defaultPage
+	pm[0x00][0x00] = 0
 	w := make([]byte, 2)
 	r := make([]byte, 2)
 	err = pmloop.Tx(w, r)
@@ -282,23 +282,23 @@ func TestPageMapReadSimpleMap(t *testing.T) {
 }
 
 func TestPageMapWriteSimpleMap(t *testing.T) {
-	pm := make(map[int8]map[byte]int32)
+	pm := make(map[byte]map[byte]byte)
 	pageMaped := &Device{PM: pm}
 	pmloop, err := pageMaped.Open()
 	if err != nil {
 		t.Errorf("expect nil error but got %v: ", err)
 	}
-	defaultPage := make(map[byte]int32)
-	pm[-1] = defaultPage
-	pm[-1][0x00] = 0
-	pm[-1][0x0B] = 0xBB
+	defaultPage := make(map[byte]byte)
+	pm[0x00] = defaultPage
+	pm[0x00][0x00] = 0
+	pm[0x00][0x0B] = 0xBB
 
 	w := []byte{0x8B, 0xAA}
 	r := make([]byte, 2)
 
 	err = pmloop.Tx(w, r)
 
-	if byte(pm[-1][0x0B]) != 0xAA {
-		t.Errorf("expected 0xAA but got %v ", byte(pm[-1][0x0B]))
+	if byte(pm[0x00][0x0B]) != 0xAA {
+		t.Errorf("expected 0xAA but got %v ", byte(pm[0x00][0x0B]))
 	}
 }

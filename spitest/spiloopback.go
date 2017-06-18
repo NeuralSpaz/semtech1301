@@ -1,7 +1,6 @@
 package spitest
 
 import (
-	"encoding/binary"
 	"errors"
 	"sync"
 
@@ -10,8 +9,8 @@ import (
 
 type Device struct {
 	MemoryMap bool
-	MM        map[byte]byte           // address mapped
-	PM        map[int8]map[byte]int32 // page address mapped
+	MM        map[byte]byte          // address mapped
+	PM        map[byte]map[byte]byte // page address mapped
 	// Pin
 }
 
@@ -31,7 +30,7 @@ type MMDeviceConn struct {
 }
 
 type PMDeviceConn struct {
-	PM    map[int8]map[byte]int32
+	PM    map[byte]map[byte]byte
 	Txbuf []byte
 	Rxbuf []byte
 	sync.Mutex
@@ -93,37 +92,30 @@ func (s *PMDeviceConn) Tx(w, r []byte) error {
 	}
 	// log.Println("Length of tx", len(w))
 	// get current page
-	page, ok := s.PM[-1][0x00] // check the current page pointer
+	page, ok := s.PM[0x00][0x00] // check the current page pointer
 	if !ok {
 		return PagePointerError
 	}
-	pg := int8(page & 0x03) // apply page mask
+	pg := page & 0x03 // apply page mask
 
 	// fmt.Printf("current page: %d\n", pg)
 
 	address := clearBit(w[0], 7)
 	if address < 33 {
-		pg = -1 //all page -1 registers are all 32 or less
+		pg = 0x00 //all page -1 registers are all 32 or less
 	}
 	if hasBit(w[0], 7) { // WriteRegister
 		// fmt.Println("Write request")
 		if address == 0x00 { // change page
 			// fmt.Println("page change request")
-			s.PM[-1][0x00] = int32(w[1] & 0x03) // force int32
+			s.PM[0x00][0x00] = w[1] & 0x03 // force int32
 		} else {
-			s.PM[pg][address] = int32(w[1])
+			s.PM[pg][address] = w[1]
 		}
 	} else { // ReadRegister
-		value := s.PM[pg][address]
-		// if !ok {
-		// 	return errors.New("no value mapped to register")
-		// }
-		buf := make([]byte, 4)
-		binary.BigEndian.PutUint32(buf, uint32(value))
-		// fmt.Printf("%08x\n", buf)
-		r[0] = 0x00 // always garbage
-		copy(r[1:], buf[len(buf)-(len(r)-1):])
-
+		for i := 1; i < len(w); i++ {
+			r[i] = s.PM[pg][w[i-1]]
+		}
 	}
 
 	return nil

@@ -266,25 +266,35 @@ func TestReadRegisterByNameWithLoopBackMM(t *testing.T) {
 }
 
 // helper
-func initPageMapForsx1301() map[int8]map[byte]int32 {
-	paged := make(map[byte]int32)
-	page0 := make(map[byte]int32)
-	page1 := make(map[byte]int32)
-	page2 := make(map[byte]int32)
-	pagemap := make(map[int8]map[byte]int32)
-	pagemap[-1] = paged
+func initPageMapForsx1301() map[byte]map[byte]byte {
+	// paged := make(map[byte]byte)
+	page0 := make(map[byte]byte)
+	page1 := make(map[byte]byte)
+	page2 := make(map[byte]byte)
+	pagemap := make(map[byte]map[byte]byte)
+	// pagemap[-1] = paged
 	pagemap[0] = page0
 	pagemap[1] = page1
 	pagemap[2] = page2
 
 	//TODO:
 	// need to be actual regiser map combining what actual register would
-	// return not just the default value ie map[page]map[address]byte so
+	// return not just the default value ie map[page]map[address]data so
 	// that read register and write register and by name are written correctly
 	// and tested before actual hardware is used.
 	// Capture from logic analiser should match testing buffer.
 	for _, v := range Registers {
-		pagemap[v.page][v.address] = v.defaultValue
+		data := register2ByteSlice(int64(v.defaultValue), v.length, v.offset, v.signed)
+		var page byte
+		if v.page == -1 {
+			page = 0
+		} else {
+			page = byte(v.page)
+		}
+		addr := v.address
+		for i := range data {
+			pagemap[page][addr+byte(i)] = data[i] ^ pagemap[page][addr+byte(i)]
+		}
 	}
 
 	return pagemap
@@ -377,3 +387,124 @@ func TestReadRegisterByNamePMWithPageChange(t *testing.T) {
 		}
 	}
 }
+
+func register2ByteSlice(value int64, length uint8, offset uint8, signed bool) []byte {
+	buf := make([]byte, 4) // maximum length of value
+	binary.BigEndian.PutUint32(buf, uint32(value))
+
+	var byteToReturn uint8
+
+	switch {
+	case length > 24:
+		byteToReturn = 4
+		break
+	case length > 16:
+		byteToReturn = 3
+		break
+	case length > 8:
+		byteToReturn = 2
+		break
+	default:
+		byteToReturn = 1
+	}
+
+	if signed {
+		if length%8 != 0 {
+			bitsToClear := 8 - length%8
+			for i := 0; i < int(bitsToClear); i++ {
+				buf[4-byteToReturn] = clearBit(buf[4-byteToReturn], 7-uint8(i))
+			}
+		}
+	}
+	// only register with single values < 1 byte are offset
+	if byteToReturn == 1 {
+		buf[3] = buf[3] << offset
+	}
+
+	return buf[4-byteToReturn:]
+}
+
+func TestRegister2ByteSlice(t *testing.T) {
+	tests := []struct {
+		value  int64
+		length uint8
+		offset uint8
+		signed bool
+		want   []byte
+	}{
+		{1, 8, 0, false, []byte{0x01}},            //single byte values
+		{15, 8, 0, false, []byte{0x0F}},           //single byte values
+		{127, 8, 0, false, []byte{0x7F}},          //single byte values
+		{-120, 8, 0, true, []byte{0x88}},          //single byte values
+		{255, 8, 0, false, []byte{0xFF}},          //single byte values
+		{-7, 5, 0, true, []byte{0x19}},            //signed 5 bit value
+		{-7, 5, 1, true, []byte{0x32}},            //signed 5 bit value offset by 1
+		{-7, 5, 2, true, []byte{0x64}},            //signed 5 bit value offset by 2
+		{-7, 5, 3, true, []byte{0xC8}},            //signed 5 bit value offset by 2
+		{1, 0, 0, false, []byte{0x01}},            // single bit values
+		{1, 1, 1, false, []byte{0x02}},            // single bit values
+		{1, 1, 2, false, []byte{0x04}},            // single bit values
+		{1, 1, 3, false, []byte{0x08}},            // single bit values
+		{1, 1, 4, false, []byte{0x10}},            // single bit values
+		{1, 1, 5, false, []byte{0x20}},            // single bit values
+		{1, 1, 6, false, []byte{0x40}},            // single bit values
+		{1, 1, 7, false, []byte{0x80}},            // single bit values
+		{1, 0, 0, false, []byte{0x01}},            // four bit values
+		{1, 4, 1, false, []byte{0x02}},            // four bit values
+		{1, 4, 2, false, []byte{0x04}},            // four bit values
+		{1, 4, 3, false, []byte{0x08}},            // four bit values
+		{1, 4, 4, false, []byte{0x10}},            // four bit values
+		{15, 0, 0, false, []byte{0x0F}},           // four bit values
+		{15, 4, 1, false, []byte{0x1E}},           // four bit values
+		{15, 4, 2, false, []byte{0x3C}},           // four bit values
+		{15, 4, 3, false, []byte{0x78}},           // four bit values
+		{15, 4, 4, false, []byte{0xF0}},           // four bit values
+		{0, 7, 0, false, []byte{0x00}},            // seven bit values
+		{1, 7, 0, false, []byte{0x01}},            // seven bit values
+		{1, 7, 1, false, []byte{0x02}},            // seven bit values
+		{127, 7, 0, false, []byte{0x7F}},          // seven bit values
+		{127, 7, 1, false, []byte{0xFE}},          // seven bit values
+		{1, 16, 0, false, []byte{0x00, 0x01}},     //two byte values
+		{65280, 16, 0, false, []byte{0xFF, 0x00}}, //two byte values
+		{8191, 16, 0, false, []byte{0x1F, 0xFF}},  //two byte values
+		{-123, 16, 0, true, []byte{0xFF, 0x85}},   //two byte values
+		// 13 bit signed int -384 = 0b 1 1110 1000 0000
+		// want other bits in two byte response to be zero
+		// -384 {0x1e,0x80} eg for LGW_IF_FREQ
+		{-384, 13, 0, true, []byte{0x1e, 0x80}},                    //two byte values
+		{4092, 12, 0, false, []byte{0x0F, 0xFC}},                   //two byte values
+		{11184810, 24, 0, false, []byte{0xAA, 0xAA, 0xAA}},         //three byte values
+		{1789569706, 32, 0, false, []byte{0x6A, 0xAA, 0xAA, 0xAA}}, //four byte values
+		{2863311530, 32, 0, false, []byte{0xAA, 0xAA, 0xAA, 0xAA}}, //four byte values
+		{-1, 32, 0, true, []byte{0xFF, 0xFF, 0xFF, 0xFF}},          //four byte values signed
+
+	}
+	for index, test := range tests {
+		got := register2ByteSlice(test.value, test.length, test.offset, test.signed)
+		if len(got) != len(test.want) {
+			t.Errorf("test %d: expected length to be %d but got length %d", index, len(test.want), len(got))
+		}
+		for i := range test.want {
+			if test.want[i] != got[i] {
+				t.Errorf("test %d:%d: expected %02x but got %02x", index, i, test.want[i], got[i])
+			}
+		}
+	}
+}
+
+// func TestAllPageMappedRegistersReadbyName(t *testing.T){
+// 	loopback := newPageMappedSX1301()
+//
+// 	value, err := loopback.ReadRegisterByName("LGW_TX_STATUS")
+// 	if err != nil {
+// 		t.Errorf("expected no error but got: %v", err)
+// 	}
+// 	registerDefault := Registers["LGW_TX_STATUS"].defaultValue
+// 	want := make([]byte, 4)
+// 	binary.BigEndian.PutUint32(want, uint32(registerDefault))
+// 	for k := range value {
+// 		if value[k] != want[k+(4-len(value))] {
+// 			t.Errorf("expected the same value as default %v but got %v", want, value)
+// 		}
+// 	}
+// }
